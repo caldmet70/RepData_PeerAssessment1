@@ -1,25 +1,252 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "Parmod Kumar"
+date: "14 June 2015"
+output: html_document
 ---
 
+Reproducible Research Peer Assessment 1
+========================================================
 
 ## Loading and preprocessing the data
 
+In the start, we can check the working directory with `getwd()` and if needed we can set the working directory using `setwd()` command. First we need to load the data in the R/RStudio and then do some preprocessing to clean the data and make the data presentable for analysis. The data looks in good shape, we only need to convert the dates into a `POSIXlt` class for convenience.
 
+```{r cache=TRUE}
+unzip("activity.zip") # Unzip archive
+dat <- read.csv("activity.csv") # Read in data file
 
-## What is mean total number of steps taken per day?
+# Turn the date data into a valid date class
+# Allows for easier processing
+# Dates are in YYYY-MM-DD format
+dates <- strptime(dat$date, "%Y-%m-%d")
+dat$date <- dates
 
+# Keep a list of all possible days
+uniqueDates <- unique(dates)
+# Keep a list of all possible intervals
+uniqueIntervals <- unique(dat$interval)
+```
 
+## What is the mean total number of steps taken per day?
+
+It is a good idea to split up the data first into individual data frames where each data frame represents the data for a particular day. In the end, we can accumulates all of the steps taken for each day into a vector. Each element in this vector represents the total number of steps taken for a particular day (61 in total). Here we ignore `NA` values.
+
+```{r cache=TRUE, fig.width=11, fig.height=6}
+# Part 2 - Create a histogram of the total number of steps taken
+# each day
+# First split up the data frame for steps by day
+stepsSplit <- split(dat$steps, dates$yday)
+
+# Next find the total number of steps over each day
+totalStepsPerDay <- sapply(stepsSplit, sum, na.rm=TRUE)
+
+# Plot a (pseudo) histogram where the x-axis denotes the day
+# and the y-axis denotes the total number of steps taken 
+# for each day
+plot(uniqueDates, totalStepsPerDay, main="Histogram of steps taken each day", 
+     xlab = "Date (October to November 2012)", ylab = "Frequency", type = "h", 
+     lwd = 8, col = "blue")
+```
+
+The mean steps per day are:
+
+```{r cache=TRUE}
+meanStepsPerDay <- sapply(stepsSplit, mean, na.rm=TRUE)
+meanDataFrame <- data.frame(date=uniqueDates, meanStepsPerDay=meanStepsPerDay, row.names=NULL)
+meanDataFrame
+```
+
+The median steps per day are:
+```{r cache=TRUE}
+medianStepsPerDay <- sapply(stepsSplit, median, na.rm=TRUE)
+medianDataFrame <- data.frame(date=uniqueDates, medianStepsPerDay=medianStepsPerDay, row.names=NULL)
+medianDataFrame
+```
+
+Here is a sample between October 5th to October 10th of 2012:
+
+```{r cache=TRUE}
+stepsSplit[5:7]
+```
 
 ## What is the average daily activity pattern?
 
+We again split up the data into individual data frames and compute the mean for each time interval. Here also `NA` are ignored.
 
+```{r cache=TRUE, fig.width=11, fig.height=6}
+# Part 3 - Time-series plot (type="l")
+# x-axis - Time interval (5, 10, 15, ...)
+# y-axis - Average number of steps taken across all days for this time interval
+
+# Split up the data according to the interval
+intervalSplit <- split(dat$steps, dat$interval)
+
+# Find the average amount of steps per time interval - ignore NA values
+averageStepsPerInterval <- sapply(intervalSplit, mean, na.rm=TRUE)
+
+# Plot the time-series graph
+plot(uniqueIntervals, averageStepsPerInterval, type="l",
+     main="Average number of steps per interval across all days", 
+     xlab="Interval", ylab="Average # of steps across all days", 
+     lwd = 2, col="blue")
+
+# Find the location of where the maximum is
+maxIntervalDays <- max(averageStepsPerInterval, na.rm=TRUE)
+maxIndex <- as.numeric(which(averageStepsPerInterval == maxIntervalDays))
+
+# Plot a vertical line where the max is
+maxInterval <- uniqueIntervals[maxIndex]
+abline(v=maxInterval, col="red", lwd = 2)
+```
+
+With reference to the above plot, the interval that records the maximum number of steps averaged across all days is:
+
+```{r cache=TRUE}
+maxInterval
+```
 
 ## Imputing missing values
 
+To impute the missing values, first we need to calculate the total number of missing values.
 
+```{r cache=TRUE}
+# Part 4 - Calculate total amount of missing values in the data set
+# Use complete.cases to find a logical vector that returns TRUE
+# if it is a complete row (a.k.a. no NA values) and FALSE otherwise
+completeRowsBool <- complete.cases(dat$steps)
+numNA <- sum(as.numeric(!completeRowsBool))
+numNA
+```
+
+All missing values `NAs` in the data set are to be replaced with the mean of that particular 5-minute interval the observation.
+
+```{r cache=TRUE}
+# Modify the meanStepsPerDay vector that contains the mean steps taken
+# for this 5 minute interval
+# Each day consists of 288 intervals and there are 61 days in total
+# First remove NaN values and replace with 0.  
+# NaN values are produced when the entire day was filled with NA values
+# Essentially the mean and median would be zero anyway!
+meanStepsPerDay[is.nan(meanStepsPerDay)] <- 0
+
+# Now create a replicated vector 288 times
+# The reason why we're doing this is because the slots
+# in the vector naturally line up with the interval for
+# a particular day.  Now, all we have to do is find where
+# in the data set there are missing steps, and simply do
+# a copy from one vector to the other
+meanColumn <- rep(meanStepsPerDay, 288)
+
+# The steps before replacement
+rawSteps <- dat$steps
+
+# Find any values that are NA in the raw steps data
+stepsNA <- is.na(rawSteps)
+
+# Now replace these values with their corresponding mean
+rawSteps[stepsNA] <- meanColumn[stepsNA]
+
+# Throw these back into a new data frame
+datNew <- dat
+datNew$steps <- rawSteps
+```
+
+Now we can look at the histogram of the new data:
+
+```{r cache=TRUE, fig.width=11, fig.height=12}
+# Repeat Part 2 now
+# First split up the data frame for steps by day
+stepsSplitNew <- split(datNew$steps, dates$yday)
+
+# Next find the total number of steps over each day
+# There should not be an NA values and so we don't need
+# to set the flag
+totalStepsPerDayNew <- sapply(stepsSplitNew, sum)
+
+# Plot a (pseudo) histogram where the x-axis denotes the day
+# and the y-axis denotes the total number of steps taken 
+# for each day
+par(mfcol=c(2,1))
+# Plot the original histogram first
+plot(uniqueDates, totalStepsPerDay, main="Histogram of steps taken each day before imputing",      xlab="Date (October to November 2012)", ylab="Frequency", type="h", lwd = 8, col="blue")
+# Plot the modified histogram after
+plot(uniqueDates, totalStepsPerDayNew, main="Histogram of steps taken each day after imputing", xlab = "Date (October to November 2012)", ylab = "Frequency",
+     type = "h", lwd = 8, col = "blue")
+```
+
+Here we have replaced all of the `NaN` values to `0`. The mean steps per day of the new data are:
+
+```{r cache=TRUE}
+meanStepsPerDayNew <- sapply(stepsSplitNew, mean)
+meanDataFrameNew <- data.frame(date=uniqueDates, meanStepsPerDay=meanStepsPerDay, 
+                               meanStepsPerDayNew=meanStepsPerDayNew, row.names=NULL)
+meanDataFrameNew
+```
+
+The median steps per day are:
+```{r cache=TRUE}
+medianStepsPerDayNew <- sapply(stepsSplitNew, median)
+medianDataFrameNew <- data.frame(date=uniqueDates, medianStepsPerDay=medianStepsPerDay, 
+                                 medianStepsPerDayNew=medianStepsPerDayNew, row.names=NULL)
+medianDataFrameNew
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Here we need to split up the data into two data frames - one for weekdays, and another for weekends.
+
+```{r cache=TRUE}
+# Part 5 - Now split up the data so that it's sorted by weekday or weekend
+# We have casted the dates to a POSIXlt class so wday is part of this class
+# wday is an integer ranging from 0 to 6 that represents the day of the week
+# 0 is for Sunday, 1 is for Monday, going up to 6 for Saturday
+# Store this into wdays
+wdays <- dates$wday
+
+# Create a new factor variable that classifies the day as either a weekday or weekend
+# First, create a numeric vector with 2 levels - 1 is for a weekday, 2 for a weekend
+classifywday <- rep(0, 17568) # 17568 observations overall
+
+# Any days that are from Monday to Friday, set the numeric vector in these positions
+# as 1
+classifywday[wdays >= 1 & wdays <= 5] <- 1
+
+# Any days that are on Saturday or Sunday, set the numeric vector in these positions
+# as 2
+classifywday[wdays == 6 | wdays == 0] <- 2
+
+# Create a new factor variable that has labels Weekdays and Weekends
+daysFactor <- factor(classifywday, levels=c(1,2), labels=c("Weekdays", "Weekends"))
+
+# Create a new column that contains this factor for each day
+datNew$typeOfDay <- daysFactor
+
+# Now split up into two data frames
+datWeekdays <- datNew[datNew$typeOfDay == "Weekdays", ]
+datWeekends <- datNew[datNew$typeOfDay == "Weekends", ]
+```
+
+Here we get two seperate vectors, one for the weekdays and the other for weekends.
+
+```{r cache=TRUE, fig.width=11, fig.height=12}
+# Further split up the Weekdays and Weekends into their own intervals
+datSplitWeekdays <- split(datWeekdays$steps, datWeekdays$interval)
+datSplitWeekends <- split(datWeekends$steps, datWeekends$interval)
+
+# Find the average for each interval
+meanStepsPerWeekdayInterval <- sapply(datSplitWeekdays, mean)
+meanStepsPerWeekendInterval <- sapply(datSplitWeekends, mean)
+
+par(mfcol=c(2,1))
+plot(uniqueIntervals, meanStepsPerWeekdayInterval, type="l",
+     main="Average number of steps per interval across all weekdays", 
+     xlab="Interval", ylab="Average # of steps across all weekdays", 
+     lwd = 2, col="blue")
+plot(uniqueIntervals, meanStepsPerWeekendInterval, type="l",
+     main="Average number of steps per interval across all weekends", 
+     xlab="Interval", ylab="Average # of steps across all weekends", 
+     lwd = 2, col="blue")
+```
+
+Yes there are differences in activity pattern between weekdays and weekends which is very much evident.
