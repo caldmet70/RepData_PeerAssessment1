@@ -598,4 +598,5 @@ plot(uniqueIntervals, meanStepsPerWeekendInterval, type="l",
 
 ![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png) 
 
-Yes there are differences in activity pattern between weekdays and weekends which is very much evident.
+Yes there are differences in activity pattern between two cases, weekdays and weekends which is very much evident.
+
