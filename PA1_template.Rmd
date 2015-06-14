@@ -5,6 +5,7 @@ date: "14 June 2015"
 output: html_document
 ---
 
+
 Reproducible Research Peer Assessment 1
 ========================================================
 
